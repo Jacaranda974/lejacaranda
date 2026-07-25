@@ -1,6 +1,709 @@
 <!DOCTYPE html>
-<html>
-<body style="margin:0; background-color:white; display:flex; justify-content:center; align-items:center; min-height:100vh;">
-    <img src="Jacaranda.png" style="max-width:100%; height:auto;">
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Air Plan</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- PDF Generation Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <!-- Firebase Modular SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { 
+      getAuth, 
+      signInWithEmailAndPassword, 
+      createUserWithEmailAndPassword, 
+      signOut, 
+      onAuthStateChanged 
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { 
+      getFirestore, 
+      doc, 
+      setDoc, 
+      getDocs, 
+      collection 
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    // -------------------------------------------------------------
+    // YOUR FIREBASE CONFIG
+    // -------------------------------------------------------------
+    const firebaseConfig = {
+      apiKey: "AIzaSyBbujfUuJwjz4EM7Nazh8UgaA4-_QuFbGw",
+      authDomain: "air-plan-97ba1.firebaseapp.com",
+      projectId: "air-plan-97ba1",
+      storageBucket: "air-plan-97ba1.firebasestorage.app",
+      messagingSenderId: "826279348977",
+      appId: "1:826279348977:web:0627cd3b505c6d457c7750"
+    };
+
+    // Default System Admin Email
+    const ADMIN_EMAIL = "ariel@example.com"; // <-- Set your admin login email here
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    window.fbAuth = auth;
+    window.fbDb = db;
+    window.ADMIN_EMAIL = ADMIN_EMAIL;
+
+    // Auth Observer
+    onAuthStateChanged(auth, async (user) => {
+      const authBtn = document.getElementById('authStatusBtn');
+      const adminPanel = document.getElementById('adminPanel');
+
+      if (user) {
+        authBtn.innerText = `Sign Out (${user.email})`;
+        authBtn.onclick = () => signOut(auth);
+
+        // Store or update user in Firestore
+        await setDoc(doc(db, "users", user.uid), {
+          email: user.email,
+          role: user.email === ADMIN_EMAIL ? "admin" : "user",
+          lastLogin: new Date().toISOString()
+        }, { merge: true });
+
+        // Unlock Admin Panel if Admin
+        if (user.email === ADMIN_EMAIL) {
+          adminPanel.classList.remove('hidden');
+          loadUserList();
+        } else {
+          adminPanel.classList.add('hidden');
+        }
+      } else {
+        authBtn.innerText = "Sign In / Register";
+        authBtn.onclick = () => toggleAuthModal(true);
+        adminPanel.classList.add('hidden');
+      }
+    });
+
+    async function loadUserList() {
+      const userListEl = document.getElementById('adminUserList');
+      userListEl.innerHTML = '<p class="text-xs text-slate-400">Loading registered users...</p>';
+      
+      try {
+        const querySnapshot = await getDocs(collection(db, "users"));
+        let html = '<ul class="divide-y divide-slate-800 text-xs text-slate-300">';
+        querySnapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          const isAdmin = data.role === 'admin';
+          html += `
+            <li class="py-2 flex justify-between items-center">
+              <div>
+                <span class="font-bold text-white">${data.email}</span>
+                <span class="ml-2 text-[10px] px-1.5 py-0.5 rounded ${isAdmin ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-slate-800 text-slate-400'}">
+                  ${data.role || 'user'}
+                </span>
+              </div>
+              <span class="text-[10px] font-mono text-slate-500">Last login: ${data.lastLogin ? new Date(data.lastLogin).toLocaleDateString() : 'N/A'}</span>
+            </li>
+          `;
+        });
+        html += '</ul>';
+        userListEl.innerHTML = html;
+      } catch (err) {
+        userListEl.innerHTML = `<p class="text-xs text-rose-400">Error loading users: ${err.message}</p>`;
+      }
+    }
+
+    window.handleAuthAction = async (isRegister) => {
+      const email = document.getElementById('authEmail').value;
+      const pass = document.getElementById('authPassword').value;
+      const authError = document.getElementById('authError');
+      authError.innerText = '';
+
+      try {
+        if (isRegister) {
+          await createUserWithEmailAndPassword(auth, email, pass);
+        } else {
+          await signInWithEmailAndPassword(auth, email, pass);
+        }
+        toggleAuthModal(false);
+      } catch (err) {
+        authError.innerText = err.message;
+      }
+    };
+  </script>
+
+  <style>
+    body {
+      background: #01101d;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    /* Video Background Element */
+    #bgVideo {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      z-index: 0;
+      opacity: 0.55;
+      pointer-events: none;
+    }
+
+    .underwater-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.3;
+      background-image: 
+        radial-gradient(circle at 20% 80%, rgba(6, 182, 212, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 50%);
+    }
+
+    #seabedCanvas {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100vw;
+      height: 180px;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    @keyframes swimRight {
+      0% { left: -200px; }
+      100% { left: calc(100vw + 200px); }
+    }
+
+    @keyframes tailWiggle {
+      0%, 100% { transform: scaleX(1) rotate(0deg) translateY(0px); }
+      25% { transform: scaleX(1) rotate(2deg) translateY(-8px); }
+      50% { transform: scaleX(1) rotate(0deg) translateY(-3px); }
+      75% { transform: scaleX(1) rotate(-2deg) translateY(6px); }
+    }
+
+    .whale-container {
+      position: fixed;
+      top: 15%;
+      z-index: 3;
+      animation: swimRight 50s linear infinite;
+    }
+    .whale-body {
+      display: inline-block;
+      font-size: 5rem;
+      animation: tailWiggle 4s ease-in-out infinite;
+      filter: drop-shadow(0 10px 15px rgba(0,0,0,0.5));
+    }
+
+    .glass-card {
+      background: rgba(8, 20, 36, 0.75);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(217, 119, 6, 0.25);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .helmet-container {
+      position: relative;
+      background: linear-gradient(145deg, rgba(140, 90, 40, 0.35), rgba(70, 40, 15, 0.3), rgba(30, 15, 5, 0.4));
+      backdrop-filter: blur(14px);
+      border-radius: 180px 180px 35px 35px;
+      border: 2px solid rgba(212, 175, 55, 0.4);
+      box-shadow: 
+        0 15px 40px rgba(0, 0, 0, 0.7),
+        inset 0 10px 20px rgba(255, 230, 150, 0.08),
+        inset 0 -10px 20px rgba(0, 0, 0, 0.6);
+      padding: 24px 18px 18px 18px;
+    }
+
+    .main-viewport {
+      position: relative;
+      background: rgba(3, 12, 22, 0.85);
+      border: 4px solid rgba(197, 155, 39, 0.5);
+      border-radius: 50%;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px 20px;
+    }
+
+    .brass-plate {
+      background: linear-gradient(to bottom, rgba(243, 229, 171, 0.7), rgba(197, 155, 39, 0.7), rgba(120, 82, 38, 0.7));
+      border: 1px solid rgba(60, 36, 13, 0.6);
+      border-radius: 4px;
+      color: #1c0f00;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+    }
+  </style>
+</head>
+<body class="min-h-screen text-slate-100 overflow-x-hidden selection:bg-amber-500 selection:text-slate-900 pb-20">
+
+  <!-- Background Video configured to 0.5 (50% speed) -->
+  <video id="bgVideo" autoplay loop muted playsinline src="background.mp4" onloadeddata="this.playbackRate = 0.5;"></video>
+
+  <div class="underwater-overlay"></div>
+  <canvas id="seabedCanvas"></canvas>
+  <div class="whale-container"><span class="whale-body">🐋</span></div>
+
+  <div class="max-w-7xl mx-auto px-6 py-6 relative z-10">
+    
+    <header class="mb-6 flex justify-between items-center">
+      <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+        Air Plan
+      </h1>
+
+      <div class="flex items-center gap-3">
+        <button id="authStatusBtn" class="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs px-3 py-1.5 rounded-lg font-semibold hover:bg-amber-500/30 transition">
+          Sign In / Register
+        </button>
+      </div>
+    </header>
+
+    <!-- Admin Panel (Hidden by default, unlocked for ADMIN_EMAIL) -->
+    <div id="adminPanel" class="hidden glass-card rounded-xl p-4 mb-6 border-amber-500/60 bg-amber-950/20">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+          🛡️ Admin Control Panel
+        </h3>
+        <span class="text-[11px] text-amber-200/60">Logged in as System Admin</span>
+      </div>
+      <div id="adminUserList">
+      </div>
+    </div>
+
+    <!-- Export & Share Toolbar -->
+    <div class="glass-card rounded-xl p-3 mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <button onclick="savePlanToLocalStorage()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded-lg border border-slate-700 font-medium transition">
+          💾 Save Plan (Browser)
+        </button>
+        <button onclick="copyShareableLink()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded-lg border border-slate-700 font-medium transition">
+          🔗 Copy Share Link
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="exportToPDF()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-4 py-1.5 rounded-lg transition shadow-lg shadow-amber-500/20">
+          📄 Download PDF Slate
+        </button>
+      </div>
+    </div>
+
+    <!-- Content Area Captured for PDF Export -->
+    <div id="exportContainer" class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      
+      <!-- Left Column: Controls & Canvas Profile -->
+      <div class="lg:col-span-7 space-y-4">
+        
+        <div class="glass-card rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center bg-slate-950/60 p-1 rounded-lg border border-slate-800">
+            <button id="btnMetric" onclick="setUnits('metric')" class="px-3 py-1.5 rounded-md text-xs font-bold transition bg-amber-500/90 text-slate-950">Metric</button>
+            <button id="btnImperial" onclick="setUnits('imperial')" class="px-3 py-1.5 rounded-md text-xs font-bold transition text-slate-400 hover:text-white">Imperial</button>
+          </div>
+
+          <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2">
+              <label class="text-xs font-medium text-slate-300">Tank Setup</label>
+              <div class="flex items-center bg-slate-900/80 border border-slate-700/60 rounded-lg px-2 py-1">
+                <input type="number" id="tankVolInput" value="12" onchange="recalculate()" class="w-12 bg-transparent text-xs text-center font-mono focus:outline-none text-amber-300">
+                <span class="tankVolUnitLabel text-[10px] text-slate-400 ml-1">L</span>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <label class="text-xs font-medium text-slate-300">Tank</label>
+              <div class="flex items-center bg-slate-900/80 border border-slate-700/60 rounded-lg px-2 py-1">
+                <input type="number" id="startPressInput" value="200" onchange="recalculate()" class="w-12 bg-transparent text-xs text-center font-mono focus:outline-none text-amber-300">
+                <span class="pressUnitLabel text-[10px] text-slate-400 ml-1">bar</span>
+              </div>
+            </div>
+
+            <input type="hidden" id="sacInput" value="20">
+          </div>
+        </div>
+
+        <div class="glass-card rounded-xl p-4 relative">
+          <div class="flex justify-between items-center mb-2 px-1">
+            <span class="text-xs font-semibold uppercase tracking-wider text-amber-400/90">Interactive Profile Canvas</span>
+            <button onclick="resetWaypoints()" class="text-xs text-rose-400 hover:text-rose-300 transition">Reset Profile</button>
+          </div>
+
+          <canvas id="diveCanvas" width="700" height="420" class="w-full bg-slate-950/80 rounded-lg cursor-crosshair border border-slate-800/60"></canvas>
+          
+          <div class="flex justify-between items-center mt-2 px-1 text-[11px] text-slate-400">
+            <span>Hover to preview depth &amp; time • Click canvas to add stop pin</span>
+            <span>Right-click canvas to enter precise waypoint values</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Column: Dashboard Helmet -->
+      <div class="lg:col-span-5 space-y-2">
+        <h2 class="text-lg font-bold text-slate-200 px-2">Dashboard</h2>
+        
+        <div class="helmet-container shadow-2xl relative">
+          
+          <div class="main-viewport relative z-10">
+            <div class="text-center border-b border-amber-500/20 pb-2 relative z-10 mt-1">
+              <h3 class="text-xs font-black tracking-widest text-amber-400/90 uppercase">NAVY MARK V DASHBOARD</h3>
+              <p id="tankCapacitySubtext" class="text-[11px] text-amber-200/70 font-mono mt-0.5">Total Capacity: 2400 L (200 bar)</p>
+            </div>
+
+            <div class="overflow-y-auto max-h-48 my-2 px-1 relative z-10">
+              <table class="w-full text-left text-xs">
+                <thead class="text-[9px] text-amber-400/80 uppercase tracking-wider border-b border-amber-500/20">
+                  <tr>
+                    <th class="py-1">STOP</th>
+                    <th class="py-1">TIME</th>
+                    <th class="py-1">DEPTH</th>
+                    <th class="py-1 text-right">USED</th>
+                    <th class="py-1 text-right">PRESS. LEFT</th>
+                  </tr>
+                </thead>
+                <tbody id="waypointsTable" class="divide-y divide-amber-900/20 font-mono text-slate-200 text-xs">
+                </tbody>
+              </table>
+            </div>
+
+            <div class="border-t border-amber-500/20 pt-2 grid grid-cols-2 gap-2 text-center relative z-20 mb-1">
+              <div>
+                <div class="text-[9px] uppercase tracking-wider text-amber-300/60">TOTAL AIR CONSUMED</div>
+                <div id="totalGas" class="text-lg font-black text-amber-400/90 font-mono">0 L</div>
+              </div>
+              <div>
+                <div class="text-[9px] uppercase tracking-wider text-amber-300/60">FINAL PRESSURE LEFT</div>
+                <div id="finalPressure" class="text-lg font-black text-emerald-400 font-mono">200.0 bar</div>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="brass-plate text-center py-1 mt-3 relative z-10 text-[9px] opacity-85">
+            MARK V MOD 1 • DEEP SEA DIVING HELMET
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Authentication Modal -->
+  <div id="authModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="glass-card max-w-sm w-full p-6 rounded-2xl border-amber-500/40 relative">
+      <button onclick="toggleAuthModal(false)" class="absolute top-3 right-3 text-slate-400 hover:text-white text-lg">✕</button>
+      <h3 class="text-lg font-bold text-white mb-4 text-center">Account Sign In / Register</h3>
+      
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs text-slate-300">Email Address</label>
+          <input type="email" id="authEmail" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-amber-300 focus:outline-none mt-1">
+        </div>
+        <div>
+          <label class="text-xs text-slate-300">Password</label>
+          <input type="password" id="authPassword" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-amber-300 focus:outline-none mt-1">
+        </div>
+
+        <p id="authError" class="text-xs text-rose-400 font-mono"></p>
+
+        <div class="flex gap-2 pt-2">
+          <button onclick="handleAuthAction(false)" class="w-1/2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2 rounded-lg text-xs">Sign In</button>
+          <button onclick="handleAuthAction(true)" class="w-1/2 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 rounded-lg text-xs border border-slate-700">Register</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Dive Planner Logic ---
+    let units = 'metric';
+    let waypoints = [];
+    let hoverPos = null;
+
+    // Video Playback Speed set to 50% (0.5)
+    const bgVideo = document.getElementById('bgVideo');
+    if (bgVideo) {
+      bgVideo.playbackRate = 0.5;
+      bgVideo.addEventListener('loadedmetadata', () => {
+        bgVideo.playbackRate = 0.5;
+      });
+    }
+
+    function toggleAuthModal(show) {
+      document.getElementById('authModal').classList.toggle('hidden', !show);
+    }
+
+    function exportToPDF() {
+      const element = document.getElementById('exportContainer');
+      const opt = {
+        margin:       0.3,
+        filename:     'air-plan-dive-slate.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, backgroundColor: '#01101d' },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
+      };
+
+      html2pdf().set(opt).from(element).save();
+    }
+
+    function copyShareableLink() {
+      const vol = document.getElementById('tankVolInput').value;
+      const press = document.getElementById('startPressInput').value;
+      const wpData = waypoints.map(w => `${w.time},${w.depth}`).join(';');
+      
+      const shareUrl = `${window.location.origin}${window.location.pathname}?units=${units}&vol=${vol}&press=${press}&wp=${encodeURIComponent(wpData)}`;
+      
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        alert('Shareable link copied to clipboard!');
+      });
+    }
+
+    function savePlanToLocalStorage() {
+      const name = prompt("Enter a name for this dive plan:", "Mediterranean Deep Dive");
+      if (!name) return;
+
+      const plan = {
+        name,
+        units,
+        vol: document.getElementById('tankVolInput').value,
+        press: document.getElementById('startPressInput').value,
+        waypoints,
+        date: new Date().toLocaleDateString()
+      };
+
+      const saved = JSON.parse(localStorage.getItem('air_plans') || '[]');
+      saved.push(plan);
+      localStorage.setItem('air_plans', JSON.stringify(saved));
+      alert(`Plan "${name}" saved locally!`);
+    }
+
+    function loadURLParameters() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('units')) units = params.get('units');
+      if (params.has('vol')) document.getElementById('tankVolInput').value = params.get('vol');
+      if (params.has('press')) document.getElementById('startPressInput').value = params.get('press');
+      if (params.has('wp')) {
+        const rawWp = decodeURIComponent(params.get('wp'));
+        waypoints = rawWp.split(';').map(str => {
+          const [t, d] = str.split(',');
+          return { time: parseFloat(t), depth: parseFloat(d) };
+        }).filter(w => !isNaN(w.time) && !isNaN(w.depth));
+      }
+    }
+
+    function renderSeabed() {
+      const sCanvas = document.getElementById('seabedCanvas');
+      sCanvas.width = window.innerWidth;
+      sCanvas.height = 180;
+      const sCtx = sCanvas.getContext('2d');
+      const w = sCanvas.width;
+      const h = sCanvas.height;
+
+      sCtx.clearRect(0, 0, w, h);
+
+      const sandGrad = sCtx.createLinearGradient(0, 40, 0, h);
+      sandGrad.addColorStop(0, '#1a1810');
+      sandGrad.addColorStop(0.3, '#2a2312');
+      sandGrad.addColorStop(1, '#0f0c06');
+
+      sCtx.beginPath();
+      sCtx.moveTo(0, h);
+      sCtx.lineTo(0, 80);
+      sCtx.quadraticCurveTo(w * 0.25, 40, w * 0.5, 75);
+      sCtx.quadraticCurveTo(w * 0.75, 110, w, 60);
+      sCtx.lineTo(w, h);
+      sCtx.closePath();
+      sCtx.fillStyle = sandGrad;
+      sCtx.fill();
+    }
+
+    window.addEventListener('resize', renderSeabed);
+    renderSeabed();
+
+    const diverImg = new Image();
+    const diverSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 180"><g><polygon points="10,95 55,95 55,115 15,135" fill="#1d4ed8"/><path d="M95 100 L 190 85 L 210 110 L 130 120 Z" fill="#032b45"/><circle cx="225" cy="78" r="22" fill="#2563eb"/></g></svg>`;
+    diverImg.src = 'data:image/svg+xml;base64,' + btoa(diverSVG);
+    diverImg.onload = () => recalculate();
+
+    const canvas = document.getElementById('diveCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    const MAX_TIME = 30;
+    const MAX_DEPTH_M = 40;
+    const MAX_DEPTH_FT = 130;
+
+    function getMaxDepth() {
+      return units === 'metric' ? MAX_DEPTH_M : MAX_DEPTH_FT;
+    }
+
+    function setUnits(mode) {
+      if (units === mode) return;
+      units = mode;
+
+      document.getElementById('btnMetric').className = mode === 'metric' 
+        ? 'px-3 py-1.5 rounded-md text-xs font-bold transition bg-amber-500/90 text-slate-950'
+        : 'px-3 py-1.5 rounded-md text-xs font-bold transition text-slate-400 hover:text-white';
+      
+      document.getElementById('btnImperial').className = mode === 'imperial'
+        ? 'px-3 py-1.5 rounded-md text-xs font-bold transition bg-amber-500/90 text-slate-950'
+        : 'px-3 py-1.5 rounded-md text-xs font-bold transition text-slate-400 hover:text-white';
+
+      document.querySelectorAll('.tankVolUnitLabel').forEach(el => el.innerText = mode === 'metric' ? 'L' : 'cu ft');
+      document.querySelectorAll('.pressUnitLabel').forEach(el => el.innerText = mode === 'metric' ? 'bar' : 'psi');
+
+      document.getElementById('tankVolInput').value = mode === 'metric' ? 12 : 80;
+      document.getElementById('startPressInput').value = mode === 'metric' ? 200 : 3000;
+
+      recalculate();
+    }
+
+    function drawChart() {
+      const width = canvas.width;
+      const height = canvas.height;
+      const margin = { top: 30, right: 30, bottom: 40, left: 50 };
+
+      ctx.clearRect(0, 0, width, height);
+
+      const plotW = width - margin.left - margin.right;
+      const plotH = height - margin.top - margin.bottom;
+
+      const getX = (t) => margin.left + (t / MAX_TIME) * plotW;
+      const getY = (d) => margin.top + (d / getMaxDepth()) * plotH;
+
+      ctx.strokeStyle = 'rgba(30, 58, 138, 0.4)';
+      ctx.lineWidth = 1;
+
+      for (let t = 0; t <= MAX_TIME; t += 5) {
+        const x = getX(t);
+        ctx.beginPath();
+        ctx.moveTo(x, margin.top);
+        ctx.lineTo(x, height - margin.bottom);
+        ctx.stroke();
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${t}m`, x, height - margin.bottom + 18);
+      }
+
+      const depthStep = units === 'metric' ? 5 : 20;
+      for (let d = 0; d <= getMaxDepth(); d += depthStep) {
+        const y = getY(d);
+        ctx.beginPath();
+        ctx.moveTo(margin.left, y);
+        ctx.lineTo(width - margin.right, y);
+        ctx.stroke();
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '11px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(`${d}${units === 'metric' ? 'm' : 'ft'}`, margin.left - 10, y + 4);
+      }
+
+      if (waypoints.length > 1) {
+        ctx.beginPath();
+        waypoints.forEach((wp, idx) => {
+          const x = getX(wp.time);
+          const y = getY(wp.depth);
+          if (idx === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 3.5;
+        ctx.stroke();
+      }
+
+      waypoints.forEach((wp, idx) => {
+        const x = getX(wp.time);
+        const y = getY(wp.depth);
+
+        ctx.beginPath();
+        ctx.arc(x, y, 7, 0, Math.PI * 2);
+        ctx.fillStyle = '#d97706';
+        ctx.fill();
+      });
+    }
+
+    function calculateConsumption() {
+      const sac = parseFloat(document.getElementById('sacInput').value) || 20;
+      const tankVol = parseFloat(document.getElementById('tankVolInput').value) || 12;
+      const startPress = parseFloat(document.getElementById('startPressInput').value) || 200;
+      
+      let totalGasConsumed = 0;
+      let remainingPressure = startPress;
+
+      const tableBody = document.getElementById('waypointsTable');
+      tableBody.innerHTML = '';
+
+      if (waypoints.length <= 1) {
+        document.getElementById('totalGas').innerText = `0 ${units === 'metric' ? 'L' : 'cu ft'}`;
+        document.getElementById('finalPressure').innerText = `${startPress.toFixed(1)} ${units === 'metric' ? 'bar' : 'psi'}`;
+        return;
+      }
+
+      for (let i = 1; i < waypoints.length; i++) {
+        const p1 = waypoints[i - 1];
+        const p2 = waypoints[i];
+        const deltaTime = p2.time - p1.time;
+        if (deltaTime <= 0) continue;
+
+        const avgDepth = (p1.depth + p2.depth) / 2;
+        const ata = units === 'metric' ? 1 + (avgDepth / 10) : 1 + (avgDepth / 33);
+        const segmentGas = sac * ata * deltaTime;
+        totalGasConsumed += segmentGas;
+
+        const pressureDrop = units === 'metric' ? (segmentGas / tankVol) : (segmentGas / tankVol) * startPress;
+        remainingPressure -= pressureDrop;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="py-1">#${i + 1}</td>
+          <td class="py-1">${p2.time}m</td>
+          <td class="py-1">${p2.depth}${units === 'metric' ? 'm' : 'ft'}</td>
+          <td class="py-1 text-right text-amber-300 font-bold">${segmentGas.toFixed(0)} ${units === 'metric' ? 'L' : 'cf'}</td>
+          <td class="py-1 text-right font-bold ${remainingPressure < 50 ? 'text-rose-400' : 'text-emerald-400'}">
+            ${Math.max(0, remainingPressure).toFixed(1)} ${units === 'metric' ? 'bar' : 'psi'}
+          </td>
+        `;
+        tableBody.appendChild(tr);
+      }
+
+      document.getElementById('totalGas').innerText = `${totalGasConsumed.toFixed(0)} ${units === 'metric' ? 'L' : 'cu ft'}`;
+      document.getElementById('finalPressure').innerText = `${Math.max(0, remainingPressure).toFixed(1)} ${units === 'metric' ? 'bar' : 'psi'}`;
+    }
+
+    function recalculate() {
+      drawChart();
+      calculateConsumption();
+    }
+
+    canvas.addEventListener('click', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+      const margin = { top: 30, right: 30, bottom: 40, left: 50 };
+      const plotW = canvas.width - margin.left - margin.right;
+      const plotH = canvas.height - margin.top - margin.bottom;
+
+      let time = Math.round(((clickX - margin.left) / plotW) * MAX_TIME);
+      let depth = Math.round(((clickY - margin.top) / plotH) * getMaxDepth());
+
+      time = Math.max(0, Math.min(MAX_TIME, time));
+      depth = Math.max(0, Math.min(getMaxDepth(), depth));
+
+      waypoints.push({ time, depth });
+      waypoints.sort((a, b) => a.time - b.time);
+      recalculate();
+    });
+
+    function resetWaypoints() {
+      waypoints = [];
+      recalculate();
+    }
+
+    loadURLParameters();
+    recalculate();
+  </script>
 </body>
 </html>
