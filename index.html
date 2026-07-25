@@ -329,7 +329,15 @@
               </div>
             </div>
 
-            <input type="hidden" id="sacInput" value="20">
+                      <!-- SAC Rate / Consumption Input -->
+            <div class="flex items-center gap-2">
+              <label class="text-xs font-medium text-slate-300">SAC Rate</label>
+              <div class="flex items-center bg-slate-900/80 border border-slate-700/60 rounded-lg px-2 py-1">
+                <input type="number" id="sacInput" value="20" onchange="recalculate()" class="w-12 bg-transparent text-xs text-center font-mono focus:outline-none text-amber-300">
+                <span class="sacUnitLabel text-[10px] text-slate-400 ml-1">L/min</span>
+              </div>
+            </div>
+
           </div>
         </div>
 
