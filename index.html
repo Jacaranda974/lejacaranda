@@ -238,7 +238,19 @@
 <body class="min-h-screen text-slate-100 overflow-x-hidden selection:bg-amber-500 selection:text-slate-900 pb-20">
 
   <!-- Background Video configured to 0.5 (50% speed) -->
-  <video id="bgVideo" autoplay loop muted playsinline src="background.mp4" onloadeddata="this.playbackRate = 0.5;"></video>
+  <video 
+  id="bgVideo" 
+  autoplay 
+  loop 
+  muted 
+  playsinline 
+  webkit-playsinline 
+  disablepictureinpicture 
+  style="pointer-events: none; -webkit-user-select: none;" 
+  src="background.mp4" 
+  onloadeddata="this.playbackRate = 0.5;">
+</video>
+
 
   <div class="underwater-overlay"></div>
   <canvas id="seabedCanvas"></canvas>
