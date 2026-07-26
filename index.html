@@ -756,7 +756,7 @@
       }
     }
 
-    function calculateConsumption() {
+   function calculateConsumption() {
   const sac = parseFloat(document.getElementById('sacInput').value) || 20;
   const tankVol = parseFloat(document.getElementById('tankVolInput').value) || 12;
   const startPress = parseFloat(document.getElementById('startPressInput').value) || 200;
@@ -776,13 +776,18 @@
     return;
   }
 
-  // Render Stop #1 (Surface / Entry Point Baseline)
-  const firstWp = waypoints[0];
+  // Prepend surface start point (0 min, 0 depth) if the first waypoint isn't (0,0)
+  const fullProfile = [...waypoints];
+  if (fullProfile[0].time > 0 || fullProfile[0].depth > 0) {
+    fullProfile.unshift({ time: 0, depth: 0 });
+  }
+
+  // Always show Surface Entry row #0 baseline
   const trStart = document.createElement('tr');
   trStart.innerHTML = `
-    <td class="py-1">#1</td>
-    <td class="py-1">${firstWp.time}m</td>
-    <td class="py-1">${firstWp.depth}${units === 'metric' ? 'm' : 'ft'}</td>
+    <td class="py-1">Start</td>
+    <td class="py-1">0m</td>
+    <td class="py-1">0${units === 'metric' ? 'm' : 'ft'}</td>
     <td class="py-1 text-right text-amber-300 font-bold">0 ${units === 'metric' ? 'L' : 'cf'}</td>
     <td class="py-1 text-right font-bold text-emerald-400">
       ${remainingPressure.toFixed(1)} ${units === 'metric' ? 'bar' : 'psi'}
@@ -790,10 +795,10 @@
   `;
   tableBody.appendChild(trStart);
 
-  // Calculate and render remaining segments (#2, #3, ...)
-  for (let i = 1; i < waypoints.length; i++) {
-    const p1 = waypoints[i - 1];
-    const p2 = waypoints[i];
+  // Calculate consumption across all segments
+  for (let i = 1; i < fullProfile.length; i++) {
+    const p1 = fullProfile[i - 1];
+    const p2 = fullProfile[i];
     const deltaTime = p2.time - p1.time;
     if (deltaTime <= 0) continue;
 
@@ -807,7 +812,7 @@
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="py-1">#${i + 1}</td>
+      <td class="py-1">#${i}</td>
       <td class="py-1">${p2.time}m</td>
       <td class="py-1">${p2.depth}${units === 'metric' ? 'm' : 'ft'}</td>
       <td class="py-1 text-right text-amber-300 font-bold">${segmentGas.toFixed(0)} ${units === 'metric' ? 'L' : 'cf'}</td>
