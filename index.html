@@ -26,9 +26,6 @@
       collection 
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    // -------------------------------------------------------------
-    // YOUR FIREBASE CONFIG
-    // -------------------------------------------------------------
     const firebaseConfig = {
       apiKey: "AIzaSyBbujfUuJwjz4EM7Nazh8UgaA4-_QuFbGw",
       authDomain: "air-plan-97ba1.firebaseapp.com",
@@ -38,8 +35,7 @@
       appId: "1:826279348977:web:0627cd3b505c6d457c7750"
     };
 
-    // Default System Admin Email
-    const ADMIN_EMAIL = "ariel@example.com"; // <-- Set your admin login email here
+    const ADMIN_EMAIL = "ariel@example.com"; 
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -49,7 +45,6 @@
     window.fbDb = db;
     window.ADMIN_EMAIL = ADMIN_EMAIL;
 
-    // Auth Observer
     onAuthStateChanged(auth, async (user) => {
       const authBtn = document.getElementById('authStatusBtn');
       const adminPanel = document.getElementById('adminPanel');
@@ -58,14 +53,12 @@
         authBtn.innerText = `Sign Out (${user.email})`;
         authBtn.onclick = () => signOut(auth);
 
-        // Store or update user in Firestore
         await setDoc(doc(db, "users", user.uid), {
           email: user.email,
           role: user.email === ADMIN_EMAIL ? "admin" : "user",
           lastLogin: new Date().toISOString()
         }, { merge: true });
 
-        // Unlock Admin Panel if Admin
         if (user.email === ADMIN_EMAIL) {
           adminPanel.classList.remove('hidden');
           loadUserList();
@@ -133,7 +126,6 @@
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
 
-    /* Video Background Element */
     #bgVideo {
       position: fixed;
       inset: 0;
@@ -180,9 +172,9 @@
 
     .whale-container {
       position: fixed;
-      top: 15%;
+      top: 12%;
       z-index: 3;
-      animation: swimRight 50s linear infinite;
+      animation: swimRight 30s linear infinite;
     }
     .whale-body {
       display: inline-block;
@@ -222,7 +214,7 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      padding: 24px 20px;
+      padding: 24px 16px;
     }
 
     .brass-plate {
@@ -237,26 +229,24 @@
 </head>
 <body class="min-h-screen text-slate-100 overflow-x-hidden selection:bg-amber-500 selection:text-slate-900 pb-20">
 
-  <!-- Background Video configured to 0.5 (50% speed) -->
   <video 
-  id="bgVideo" 
-  autoplay 
-  loop 
-  muted 
-  playsinline 
-  webkit-playsinline 
-  disablepictureinpicture 
-  style="pointer-events: none; -webkit-user-select: none;" 
-  src="background.mp4" 
-  onloadeddata="this.playbackRate = 0.5;">
-</video>
-
+    id="bgVideo" 
+    autoplay 
+    loop 
+    muted 
+    playsinline 
+    webkit-playsinline 
+    disablepictureinpicture 
+    style="pointer-events: none; -webkit-user-select: none;" 
+    src="background.mp4" 
+    onloadeddata="this.playbackRate = 0.5;">
+  </video>
 
   <div class="underwater-overlay"></div>
   <canvas id="seabedCanvas"></canvas>
   <div class="whale-container"><span class="whale-body">🐋</span></div>
 
-  <div class="max-w-7xl mx-auto px-6 py-6 relative z-10">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 relative z-10">
     
     <header class="mb-6 flex justify-between items-center">
       <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
@@ -270,7 +260,6 @@
       </div>
     </header>
 
-    <!-- Admin Panel (Hidden by default, unlocked for ADMIN_EMAIL) -->
     <div id="adminPanel" class="hidden glass-card rounded-xl p-4 mb-6 border-amber-500/60 bg-amber-950/20">
       <div class="flex items-center justify-between mb-2">
         <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
@@ -278,11 +267,9 @@
         </h3>
         <span class="text-[11px] text-amber-200/60">Logged in as System Admin</span>
       </div>
-      <div id="adminUserList">
-      </div>
+      <div id="adminUserList"></div>
     </div>
 
-    <!-- Export & Share Toolbar -->
     <div class="glass-card rounded-xl p-3 mb-6 flex flex-wrap items-center justify-between gap-3">
       <div class="flex items-center gap-2">
         <button onclick="savePlanToLocalStorage()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded-lg border border-slate-700 font-medium transition">
@@ -300,44 +287,40 @@
       </div>
     </div>
 
-    <!-- Content Area Captured for PDF Export -->
     <div id="exportContainer" class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       
-      <!-- Left Column: Controls & Canvas Profile -->
       <div class="lg:col-span-7 space-y-4">
         
-        <div class="glass-card rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
-          <div class="flex items-center bg-slate-950/60 p-1 rounded-lg border border-slate-800">
+        <div class="glass-card rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div class="flex items-center bg-slate-950/60 p-1 rounded-lg border border-slate-800 w-full sm:w-auto justify-center">
             <button id="btnMetric" onclick="setUnits('metric')" class="px-3 py-1.5 rounded-md text-xs font-bold transition bg-amber-500/90 text-slate-950">Metric</button>
             <button id="btnImperial" onclick="setUnits('imperial')" class="px-3 py-1.5 rounded-md text-xs font-bold transition text-slate-400 hover:text-white">Imperial</button>
           </div>
 
-          <div class="flex items-center gap-4">
-            <div class="flex items-center gap-2">
-              <label class="text-xs font-medium text-slate-300">Tank Setup</label>
+          <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-3 w-full sm:w-auto justify-center">
+            <div class="flex items-center gap-1.5 justify-center">
+              <label class="text-xs font-medium text-slate-300 whitespace-nowrap">Tank Setup</label>
               <div class="flex items-center bg-slate-900/80 border border-slate-700/60 rounded-lg px-2 py-1">
-                <input type="number" id="tankVolInput" value="12" onchange="recalculate()" class="w-12 bg-transparent text-xs text-center font-mono focus:outline-none text-amber-300">
-                <span class="tankVolUnitLabel text-[10px] text-slate-400 ml-1">L</span>
+                <input type="number" id="tankVolInput" value="12" onchange="recalculate()" class="w-10 bg-transparent text-xs text-center font-mono focus:outline-none text-amber-300">
+                <span class="tankVolUnitLabel text-[10px] text-slate-400 ml-0.5">L</span>
               </div>
             </div>
 
-            <div class="flex items-center gap-2">
-              <label class="text-xs font-medium text-slate-300">Tank</label>
+            <div class="flex items-center gap-1.5 justify-center">
+              <label class="text-xs font-medium text-slate-300 whitespace-nowrap">Tank</label>
               <div class="flex items-center bg-slate-900/80 border border-slate-700/60 rounded-lg px-2 py-1">
-                <input type="number" id="startPressInput" value="200" onchange="recalculate()" class="w-12 bg-transparent text-xs text-center font-mono focus:outline-none text-amber-300">
-                <span class="pressUnitLabel text-[10px] text-slate-400 ml-1">bar</span>
+                <input type="number" id="startPressInput" value="200" onchange="recalculate()" class="w-10 bg-transparent text-xs text-center font-mono focus:outline-none text-amber-300">
+                <span class="pressUnitLabel text-[10px] text-slate-400 ml-0.5">bar</span>
               </div>
             </div>
 
-                      <!-- SAC Rate / Consumption Input -->
-            <div class="flex items-center gap-2">
-              <label class="text-xs font-medium text-slate-300">SAC Rate</label>
+            <div class="flex items-center gap-1.5 justify-center col-span-2 sm:col-span-1">
+              <label class="text-xs font-medium text-slate-300 whitespace-nowrap">SAC Rate</label>
               <div class="flex items-center bg-slate-900/80 border border-slate-700/60 rounded-lg px-2 py-1">
-                <input type="number" id="sacInput" value="20" onchange="recalculate()" class="w-12 bg-transparent text-xs text-center font-mono focus:outline-none text-amber-300">
-                <span class="sacUnitLabel text-[10px] text-slate-400 ml-1">L/min</span>
+                <input type="number" id="sacInput" value="20" onchange="recalculate()" class="w-10 bg-transparent text-xs text-center font-mono focus:outline-none text-amber-300">
+                <span class="sacUnitLabel text-[10px] text-slate-400 ml-0.5">L/min</span>
               </div>
             </div>
-
           </div>
         </div>
 
@@ -349,7 +332,7 @@
 
           <canvas id="diveCanvas" width="700" height="420" class="w-full bg-slate-950/80 rounded-lg cursor-crosshair border border-slate-800/60"></canvas>
           
-          <div class="flex justify-between items-center mt-2 px-1 text-[11px] text-slate-400">
+          <div class="flex justify-between items-center mt-2 px-1 text-[11px] text-slate-400 flex-wrap gap-1">
             <span>Hover to preview depth &amp; time • Click canvas to add stop pin</span>
             <span>Right-click canvas to enter precise waypoint values</span>
           </div>
@@ -357,9 +340,7 @@
 
       </div>
 
-      <!-- Right Column: Dashboard Helmet -->
       <div class="lg:col-span-5 space-y-2">
-        <h2 class="text-lg font-bold text-slate-200 px-2">Dashboard</h2>
         
         <div class="helmet-container shadow-2xl relative">
           
@@ -369,7 +350,7 @@
               <p id="tankCapacitySubtext" class="text-[11px] text-amber-200/70 font-mono mt-0.5">Total Capacity: 2400 L (200 bar)</p>
             </div>
 
-            <div class="overflow-y-auto max-h-48 my-2 px-1 relative z-10">
+            <div class="overflow-y-auto max-h-36 my-2 px-1 relative z-10">
               <table class="w-full text-left text-xs">
                 <thead class="text-[9px] text-amber-400/80 uppercase tracking-wider border-b border-amber-500/20">
                   <tr>
@@ -385,14 +366,14 @@
               </table>
             </div>
 
-            <div class="border-t border-amber-500/20 pt-2 grid grid-cols-2 gap-2 text-center relative z-20 mb-1">
-              <div>
-                <div class="text-[9px] uppercase tracking-wider text-amber-300/60">TOTAL AIR CONSUMED</div>
-                <div id="totalGas" class="text-lg font-black text-amber-400/90 font-mono">0 L</div>
+            <div class="border-t border-amber-500/20 pt-2 flex flex-col gap-1.5 text-center relative z-20 mb-1 px-4">
+              <div class="bg-slate-900/60 rounded-lg py-1 border border-amber-500/20">
+                <div class="text-[9px] uppercase tracking-wider text-amber-300/70">TOTAL AIR CONSUMED</div>
+                <div id="totalGas" class="text-base sm:text-lg font-black text-amber-400 font-mono">0 L</div>
               </div>
-              <div>
-                <div class="text-[9px] uppercase tracking-wider text-amber-300/60">FINAL PRESSURE LEFT</div>
-                <div id="finalPressure" class="text-lg font-black text-emerald-400 font-mono">200.0 bar</div>
+              <div class="bg-slate-900/60 rounded-lg py-1 border border-amber-500/20">
+                <div class="text-[9px] uppercase tracking-wider text-amber-300/70">FINAL PRESSURE LEFT</div>
+                <div id="finalPressure" class="text-base sm:text-lg font-black text-emerald-400 font-mono">200.0 bar</div>
               </div>
             </div>
 
@@ -409,7 +390,6 @@
     </div>
   </div>
 
-  <!-- Authentication Modal -->
   <div id="authModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
     <div class="glass-card max-w-sm w-full p-6 rounded-2xl border-amber-500/40 relative">
       <button onclick="toggleAuthModal(false)" class="absolute top-3 right-3 text-slate-400 hover:text-white text-lg">✕</button>
@@ -436,12 +416,10 @@
   </div>
 
   <script>
-    // --- Dive Planner Logic ---
     let units = 'metric';
     let waypoints = [];
     let hoverPos = null;
 
-    // Video Playback Speed set to 50% (0.5)
     const bgVideo = document.getElementById('bgVideo');
     if (bgVideo) {
       bgVideo.playbackRate = 0.5;
@@ -470,9 +448,10 @@
     function copyShareableLink() {
       const vol = document.getElementById('tankVolInput').value;
       const press = document.getElementById('startPressInput').value;
+      const sac = document.getElementById('sacInput').value;
       const wpData = waypoints.map(w => `${w.time},${w.depth}`).join(';');
       
-      const shareUrl = `${window.location.origin}${window.location.pathname}?units=${units}&vol=${vol}&press=${press}&wp=${encodeURIComponent(wpData)}`;
+      const shareUrl = `${window.location.origin}${window.location.pathname}?units=${units}&vol=${vol}&press=${press}&sac=${sac}&wp=${encodeURIComponent(wpData)}`;
       
       navigator.clipboard.writeText(shareUrl).then(() => {
         alert('Shareable link copied to clipboard!');
@@ -488,6 +467,7 @@
         units,
         vol: document.getElementById('tankVolInput').value,
         press: document.getElementById('startPressInput').value,
+        sac: document.getElementById('sacInput').value,
         waypoints,
         date: new Date().toLocaleDateString()
       };
@@ -503,6 +483,7 @@
       if (params.has('units')) units = params.get('units');
       if (params.has('vol')) document.getElementById('tankVolInput').value = params.get('vol');
       if (params.has('press')) document.getElementById('startPressInput').value = params.get('press');
+      if (params.has('sac')) document.getElementById('sacInput').value = params.get('sac');
       if (params.has('wp')) {
         const rawWp = decodeURIComponent(params.get('wp'));
         waypoints = rawWp.split(';').map(str => {
@@ -541,11 +522,6 @@
     window.addEventListener('resize', renderSeabed);
     renderSeabed();
 
-    const diverImg = new Image();
-    const diverSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 180"><g><polygon points="10,95 55,95 55,115 15,135" fill="#1d4ed8"/><path d="M95 100 L 190 85 L 210 110 L 130 120 Z" fill="#032b45"/><circle cx="225" cy="78" r="22" fill="#2563eb"/></g></svg>`;
-    diverImg.src = 'data:image/svg+xml;base64,' + btoa(diverSVG);
-    diverImg.onload = () => recalculate();
-
     const canvas = document.getElementById('diveCanvas');
     const ctx = canvas.getContext('2d');
     
@@ -571,9 +547,11 @@
 
       document.querySelectorAll('.tankVolUnitLabel').forEach(el => el.innerText = mode === 'metric' ? 'L' : 'cu ft');
       document.querySelectorAll('.pressUnitLabel').forEach(el => el.innerText = mode === 'metric' ? 'bar' : 'psi');
+      document.querySelectorAll('.sacUnitLabel').forEach(el => el.innerText = mode === 'metric' ? 'L/min' : 'cu ft/min');
 
       document.getElementById('tankVolInput').value = mode === 'metric' ? 12 : 80;
       document.getElementById('startPressInput').value = mode === 'metric' ? 200 : 3000;
+      document.getElementById('sacInput').value = mode === 'metric' ? 20 : 0.7;
 
       recalculate();
     }
@@ -634,7 +612,7 @@
         ctx.stroke();
       }
 
-      waypoints.forEach((wp, idx) => {
+      waypoints.forEach((wp) => {
         const x = getX(wp.time);
         const y = getY(wp.depth);
 
@@ -642,7 +620,63 @@
         ctx.arc(x, y, 7, 0, Math.PI * 2);
         ctx.fillStyle = '#d97706';
         ctx.fill();
+        ctx.strokeStyle = '#fef3c7';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
       });
+
+      // Render Diver graphic on the latest waypoint
+      if (waypoints.length > 0) {
+        const lastWp = waypoints[waypoints.length - 1];
+        const dx = getX(lastWp.time);
+        const dy = getY(lastWp.depth);
+
+        ctx.font = '22px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🤿', dx, dy - 16);
+      }
+
+      // Render Live Hover Preview Tooltip
+      if (hoverPos) {
+        ctx.strokeStyle = 'rgba(245, 158, 11, 0.4)';
+        ctx.setLineDash([4, 4]);
+
+        ctx.beginPath();
+        ctx.moveTo(hoverPos.x, margin.top);
+        ctx.lineTo(hoverPos.x, height - margin.bottom);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(margin.left, hoverPos.y);
+        ctx.lineTo(width - margin.right, hoverPos.y);
+        ctx.stroke();
+
+        ctx.setLineDash([]);
+
+        const tooltipText = `${hoverPos.time}m | ${hoverPos.depth}${units === 'metric' ? 'm' : 'ft'}`;
+        ctx.font = 'bold 11px sans-serif';
+        const textWidth = ctx.measureText(tooltipText).width;
+
+        let tx = hoverPos.x + 10;
+        let ty = hoverPos.y - 12;
+
+        if (tx + textWidth + 12 > width - margin.right) tx = hoverPos.x - textWidth - 16;
+        if (ty - 12 < margin.top) ty = hoverPos.y + 20;
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(tx, ty - 12, textWidth + 12, 22, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#fbbf24';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(tooltipText, tx + 6, ty);
+      }
     }
 
     function calculateConsumption() {
@@ -655,6 +689,9 @@
 
       const tableBody = document.getElementById('waypointsTable');
       tableBody.innerHTML = '';
+
+      const totalCap = units === 'metric' ? (tankVol * startPress) : tankVol;
+      document.getElementById('tankCapacitySubtext').innerText = `Total Capacity: ${totalCap.toFixed(0)} ${units === 'metric' ? 'L' : 'cu ft'} (${startPress} ${units === 'metric' ? 'bar' : 'psi'})`;
 
       if (waypoints.length <= 1) {
         document.getElementById('totalGas').innerText = `0 ${units === 'metric' ? 'L' : 'cu ft'}`;
@@ -697,6 +734,36 @@
       drawChart();
       calculateConsumption();
     }
+
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const margin = { top: 30, right: 30, bottom: 40, left: 50 };
+      const plotW = canvas.width - margin.left - margin.right;
+      const plotH = canvas.height - margin.top - margin.bottom;
+
+      if (mouseX >= margin.left && mouseX <= canvas.width - margin.right &&
+          mouseY >= margin.top && mouseY <= canvas.height - margin.bottom) {
+        
+        let time = Math.round(((mouseX - margin.left) / plotW) * MAX_TIME);
+        let depth = Math.round(((mouseY - margin.top) / plotH) * getMaxDepth());
+
+        time = Math.max(0, Math.min(MAX_TIME, time));
+        depth = Math.max(0, Math.min(getMaxDepth(), depth));
+
+        hoverPos = { x: mouseX, y: mouseY, time, depth };
+      } else {
+        hoverPos = null;
+      }
+      drawChart();
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+      hoverPos = null;
+      drawChart();
+    });
 
     canvas.addEventListener('click', (e) => {
       const rect = canvas.getBoundingClientRect();
