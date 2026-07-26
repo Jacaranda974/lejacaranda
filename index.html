@@ -356,12 +356,12 @@
         <div class="helmet-container shadow-2xl relative">
           
           <div class="main-viewport relative z-10">
-            <div class="text-center border-b border-amber-500/20 pb-2 relative z-10 mt-1">
+            <div class="text-center border-b border-amber-500/20 pb-1 relative z-10 mt-1">
               <h3 class="text-xs font-black tracking-widest text-amber-400/90 uppercase">NAVY MARK V DASHBOARD</h3>
-              <p id="tankCapacitySubtext" class="text-[11px] text-amber-200/70 font-mono mt-0.5">Total Capacity: 2400 L (200 bar)</p>
+              <p id="tankCapacitySubtext" class="text-[10px] text-amber-200/70 font-mono">Total Capacity: 2400 L (200 bar)</p>
             </div>
 
-            <div class="overflow-y-auto max-h-36 my-2 px-1 relative z-10">
+            <div class="overflow-y-auto max-h-28 my-1 px-1 relative z-10">
               <table class="w-full text-left text-xs">
                 <thead class="text-[9px] text-amber-400/80 uppercase tracking-wider border-b border-amber-500/20">
                   <tr>
@@ -377,18 +377,19 @@
               </table>
             </div>
 
-            <div class="border-t border-amber-500/20 pt-2 grid grid-cols-3 gap-1.5 text-center relative z-20 mb-1 px-1">
-              <div class="bg-slate-900/60 rounded-lg py-1 px-1 border border-amber-500/20">
-                <div class="text-[8px] sm:text-[9px] uppercase tracking-wider text-amber-300/70">TOTAL TIME</div>
-                <div id="totalTime" class="text-xs sm:text-sm font-black text-cyan-400 font-mono">0 min</div>
+            <!-- Stacked Metrics Container -->
+            <div class="border-t border-amber-500/20 pt-1.5 space-y-1 relative z-20 mb-1 px-4">
+              <div class="bg-slate-900/60 rounded-lg py-1 px-2 border border-amber-500/20 text-center">
+                <div class="text-[8px] uppercase tracking-wider text-amber-300/70">TOTAL DIVE TIME</div>
+                <div id="totalTime" class="text-xs font-black text-cyan-400 font-mono">0 min</div>
               </div>
-              <div class="bg-slate-900/60 rounded-lg py-1 px-1 border border-amber-500/20">
-                <div class="text-[8px] sm:text-[9px] uppercase tracking-wider text-amber-300/70">AIR CONSUMED</div>
-                <div id="totalGas" class="text-xs sm:text-sm font-black text-amber-400 font-mono">0 L</div>
+              <div class="bg-slate-900/60 rounded-lg py-1 px-2 border border-amber-500/20 text-center">
+                <div class="text-[8px] uppercase tracking-wider text-amber-300/70">TOTAL AIR CONSUMED</div>
+                <div id="totalGas" class="text-xs font-black text-amber-400 font-mono">0 L</div>
               </div>
-              <div class="bg-slate-900/60 rounded-lg py-1 px-1 border border-amber-500/20">
-                <div class="text-[8px] sm:text-[9px] uppercase tracking-wider text-amber-300/70">PRESS. LEFT</div>
-                <div id="finalPressure" class="text-xs sm:text-sm font-black text-emerald-400 font-mono">200.0 bar</div>
+              <div class="bg-slate-900/60 rounded-lg py-1 px-2 border border-amber-500/20 text-center">
+                <div class="text-[8px] uppercase tracking-wider text-amber-300/70">FINAL PRESSURE LEFT</div>
+                <div id="finalPressure" class="text-xs font-black text-emerald-400 font-mono">200.0 bar</div>
               </div>
             </div>
 
