@@ -325,16 +325,27 @@
         </div>
 
         <div class="glass-card rounded-xl p-4 relative">
-          <div class="flex justify-between items-center mb-2 px-1">
+          <div class="flex justify-between items-center mb-2 px-1 flex-wrap gap-2">
             <span class="text-xs font-semibold uppercase tracking-wider text-amber-400/90">Interactive Profile Canvas</span>
-            <button onclick="resetWaypoints()" class="text-xs text-rose-400 hover:text-rose-300 transition">Reset Profile</button>
+            
+            <div class="flex items-center gap-2">
+              <button onclick="undoWaypoint()" class="text-xs bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold px-2.5 py-1 rounded-md border border-slate-700 transition flex items-center gap-1">
+                ↩ Undo
+              </button>
+              <button onclick="toggleAddWpModal(true)" class="text-xs bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 font-semibold px-2.5 py-1 rounded-md border border-emerald-500/40 transition flex items-center gap-1">
+                ➕ Add Waypoint
+              </button>
+              <button onclick="resetWaypoints()" class="text-xs text-rose-400 hover:text-rose-300 transition px-2 py-1">
+                Reset Profile
+              </button>
+            </div>
           </div>
 
           <canvas id="diveCanvas" width="700" height="420" class="w-full bg-slate-950/80 rounded-lg cursor-crosshair border border-slate-800/60"></canvas>
           
           <div class="flex justify-between items-center mt-2 px-1 text-[11px] text-slate-400 flex-wrap gap-1">
             <span>Hover to preview depth &amp; time • Click canvas to add stop pin</span>
-            <span>Right-click canvas to enter precise waypoint values</span>
+            <span>Use <strong>+ Add Waypoint</strong> or right-click canvas to enter exact values</span>
           </div>
         </div>
 
@@ -390,6 +401,28 @@
     </div>
   </div>
 
+  <div id="addWpModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="glass-card max-w-xs w-full p-5 rounded-2xl border-amber-500/40 relative">
+      <button onclick="toggleAddWpModal(false)" class="absolute top-3 right-3 text-slate-400 hover:text-white text-lg">✕</button>
+      <h3 class="text-sm font-bold text-amber-400 mb-3 text-center uppercase tracking-wider">➕ Add Precise Waypoint</h3>
+      
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs text-slate-300">Total Dive Time (min)</label>
+          <input type="number" id="modalTimeInput" placeholder="e.g. 15" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-amber-300 focus:outline-none mt-1 font-mono">
+        </div>
+        <div>
+          <label class="text-xs text-slate-300">Target Depth (<span class="modalDepthUnitLabel">m</span>)</label>
+          <input type="number" id="modalDepthInput" placeholder="e.g. 20" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-amber-300 focus:outline-none mt-1 font-mono">
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button onclick="submitWaypointFromModal()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2 rounded-lg text-xs transition">Add Waypoint</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="authModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
     <div class="glass-card max-w-sm w-full p-6 rounded-2xl border-amber-500/40 relative">
       <button onclick="toggleAuthModal(false)" class="absolute top-3 right-3 text-slate-400 hover:text-white text-lg">✕</button>
@@ -430,6 +463,41 @@
 
     function toggleAuthModal(show) {
       document.getElementById('authModal').classList.toggle('hidden', !show);
+    }
+
+    function toggleAddWpModal(show) {
+      document.querySelectorAll('.modalDepthUnitLabel').forEach(el => el.innerText = units === 'metric' ? 'm' : 'ft');
+      const modal = document.getElementById('addWpModal');
+      modal.classList.toggle('hidden', !show);
+      if (show) {
+        document.getElementById('modalTimeInput').focus();
+      }
+    }
+
+    function submitWaypointFromModal() {
+      const timeVal = parseFloat(document.getElementById('modalTimeInput').value);
+      const depthVal = parseFloat(document.getElementById('modalDepthInput').value);
+
+      if (isNaN(timeVal) || isNaN(depthVal)) {
+        alert("Please enter valid numerical values for both time and depth.");
+        return;
+      }
+
+      waypoints.push({ time: Math.max(0, timeVal), depth: Math.max(0, depthVal) });
+      waypoints.sort((a, b) => a.time - b.time);
+      
+      document.getElementById('modalTimeInput').value = '';
+      document.getElementById('modalDepthInput').value = '';
+      
+      toggleAddWpModal(false);
+      recalculate();
+    }
+
+    function undoWaypoint() {
+      if (waypoints.length > 0) {
+        waypoints.pop();
+        recalculate();
+      }
     }
 
     function exportToPDF() {
@@ -625,7 +693,6 @@
         ctx.stroke();
       });
 
-      // Render Diver graphic on the latest waypoint
       if (waypoints.length > 0) {
         const lastWp = waypoints[waypoints.length - 1];
         const dx = getX(lastWp.time);
@@ -637,7 +704,6 @@
         ctx.fillText('🤿', dx, dy - 16);
       }
 
-      // Render Live Hover Preview Tooltip
       if (hoverPos) {
         ctx.strokeStyle = 'rgba(245, 158, 11, 0.4)';
         ctx.setLineDash([4, 4]);
@@ -654,7 +720,18 @@
 
         ctx.setLineDash([]);
 
-        const tooltipText = `${hoverPos.time}m | ${hoverPos.depth}${units === 'metric' ? 'm' : 'ft'}`;
+        // Calculate Added Time relative to previous waypoint
+        let prevTime = 0;
+        for (let i = waypoints.length - 1; i >= 0; i--) {
+          if (waypoints[i].time <= hoverPos.time) {
+            prevTime = waypoints[i].time;
+            break;
+          }
+        }
+        const addedTime = hoverPos.time - prevTime;
+        const addedStr = addedTime >= 0 ? `+${addedTime}m` : `${addedTime}m`;
+
+        const tooltipText = `${hoverPos.depth}${units === 'metric' ? 'm' : 'ft'} | Total: ${hoverPos.time}m (${addedStr})`;
         ctx.font = 'bold 11px sans-serif';
         const textWidth = ctx.measureText(tooltipText).width;
 
@@ -782,6 +859,12 @@
       waypoints.push({ time, depth });
       waypoints.sort((a, b) => a.time - b.time);
       recalculate();
+    });
+
+    // Right-Click Canvas Listener
+    canvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      toggleAddWpModal(true);
     });
 
     function resetWaypoints() {
