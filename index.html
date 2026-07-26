@@ -345,7 +345,7 @@
           
           <div class="flex justify-between items-center mt-2 px-1 text-[11px] text-slate-400 flex-wrap gap-1">
             <span>Hover to preview depth &amp; time • Click canvas to add stop pin</span>
-            <span>Use <strong>+ Add Waypoint</strong> or right-click canvas to enter exact values</span>
+            <span>Grid auto-expands up to 12h • Right-click or use button for manual values</span>
           </div>
         </div>
 
@@ -598,9 +598,23 @@
     const canvas = document.getElementById('diveCanvas');
     const ctx = canvas.getContext('2d');
     
-    const MAX_TIME = 30;
+    const DEFAULT_MAX_TIME = 30;
     const MAX_DEPTH_M = 40;
     const MAX_DEPTH_FT = 130;
+
+    function getCurrentMaxTime() {
+      let maxWpTime = waypoints.reduce((max, wp) => Math.max(max, wp.time), 0);
+      if (hoverPos && hoverPos.time) {
+        maxWpTime = Math.max(maxWpTime, hoverPos.time);
+      }
+
+      if (maxWpTime >= DEFAULT_MAX_TIME) {
+        const target = maxWpTime + 5;
+        return Math.min(720, Math.ceil(target / 15) * 15);
+      }
+
+      return DEFAULT_MAX_TIME;
+    }
 
     function getMaxDepth() {
       return units === 'metric' ? MAX_DEPTH_M : MAX_DEPTH_FT;
@@ -639,23 +653,37 @@
       const plotW = width - margin.left - margin.right;
       const plotH = height - margin.top - margin.bottom;
 
-      const getX = (t) => margin.left + (t / MAX_TIME) * plotW;
+      const currentMaxTime = getCurrentMaxTime();
+
+      const getX = (t) => margin.left + (t / currentMaxTime) * plotW;
       const getY = (d) => margin.top + (d / getMaxDepth()) * plotH;
 
       ctx.strokeStyle = 'rgba(30, 58, 138, 0.4)';
       ctx.lineWidth = 1;
 
-      for (let t = 0; t <= MAX_TIME; t += 5) {
+      let timeStep = 5;
+      if (currentMaxTime > 180) timeStep = 60;
+      else if (currentMaxTime > 90) timeStep = 30;
+      else if (currentMaxTime > 45) timeStep = 10;
+
+      for (let t = 0; t <= currentMaxTime; t += timeStep) {
         const x = getX(t);
         ctx.beginPath();
         ctx.moveTo(x, margin.top);
         ctx.lineTo(x, height - margin.bottom);
         ctx.stroke();
 
+        let label = `${t}m`;
+        if (t >= 60 && currentMaxTime > 90) {
+          const hrs = Math.floor(t / 60);
+          const mins = t % 60;
+          label = mins > 0 ? `${hrs}h${mins}` : `${hrs}h`;
+        }
+
         ctx.fillStyle = '#64748b';
         ctx.font = '11px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(`${t}m`, x, height - margin.bottom + 18);
+        ctx.fillText(label, x, height - margin.bottom + 18);
       }
 
       const depthStep = units === 'metric' ? 5 : 20;
@@ -725,7 +753,6 @@
 
         ctx.setLineDash([]);
 
-        // Calculate Added Time relative to previous waypoint
         let prevTime = 0;
         for (let i = waypoints.length - 1; i >= 0; i--) {
           if (waypoints[i].time <= hoverPos.time) {
@@ -782,17 +809,14 @@
         return;
       }
 
-      // Prepend surface start point (0 min, 0 depth) if the first waypoint isn't (0,0)
       const fullProfile = [...waypoints];
       if (fullProfile[0].time > 0 || fullProfile[0].depth > 0) {
         fullProfile.unshift({ time: 0, depth: 0 });
       }
 
-      // Calculate total underwater time
       const maxTime = fullProfile[fullProfile.length - 1].time;
       document.getElementById('totalTime').innerText = `${maxTime} min`;
 
-      // Surface Entry baseline row
       const trStart = document.createElement('tr');
       trStart.innerHTML = `
         <td class="py-1">Start</td>
@@ -805,7 +829,6 @@
       `;
       tableBody.appendChild(trStart);
 
-      // Calculate segment values across profile
       for (let i = 1; i < fullProfile.length; i++) {
         const p1 = fullProfile[i - 1];
         const p2 = fullProfile[i];
@@ -854,10 +877,11 @@
       if (mouseX >= margin.left && mouseX <= canvas.width - margin.right &&
           mouseY >= margin.top && mouseY <= canvas.height - margin.bottom) {
         
-        let time = Math.round(((mouseX - margin.left) / plotW) * MAX_TIME);
+        const maxTime = getCurrentMaxTime();
+        let time = Math.round(((mouseX - margin.left) / plotW) * maxTime);
         let depth = Math.round(((mouseY - margin.top) / plotH) * getMaxDepth());
 
-        time = Math.max(0, Math.min(MAX_TIME, time));
+        time = Math.max(0, Math.min(720, time));
         depth = Math.max(0, Math.min(getMaxDepth(), depth));
 
         hoverPos = { x: mouseX, y: mouseY, time, depth };
@@ -880,10 +904,11 @@
       const plotW = canvas.width - margin.left - margin.right;
       const plotH = canvas.height - margin.top - margin.bottom;
 
-      let time = Math.round(((clickX - margin.left) / plotW) * MAX_TIME);
+      const maxTime = getCurrentMaxTime();
+      let time = Math.round(((clickX - margin.left) / plotW) * maxTime);
       let depth = Math.round(((clickY - margin.top) / plotH) * getMaxDepth());
 
-      time = Math.max(0, Math.min(MAX_TIME, time));
+      time = Math.max(0, Math.min(720, time));
       depth = Math.max(0, Math.min(getMaxDepth(), depth));
 
       waypoints.push({ time, depth });
@@ -891,7 +916,6 @@
       recalculate();
     });
 
-    // Right-Click Canvas Listener
     canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       toggleAddWpModal(true);
