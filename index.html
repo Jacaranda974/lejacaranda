@@ -757,55 +757,70 @@
     }
 
     function calculateConsumption() {
-      const sac = parseFloat(document.getElementById('sacInput').value) || 20;
-      const tankVol = parseFloat(document.getElementById('tankVolInput').value) || 12;
-      const startPress = parseFloat(document.getElementById('startPressInput').value) || 200;
-      
-      let totalGasConsumed = 0;
-      let remainingPressure = startPress;
+  const sac = parseFloat(document.getElementById('sacInput').value) || 20;
+  const tankVol = parseFloat(document.getElementById('tankVolInput').value) || 12;
+  const startPress = parseFloat(document.getElementById('startPressInput').value) || 200;
+  
+  let totalGasConsumed = 0;
+  let remainingPressure = startPress;
 
-      const tableBody = document.getElementById('waypointsTable');
-      tableBody.innerHTML = '';
+  const tableBody = document.getElementById('waypointsTable');
+  tableBody.innerHTML = '';
 
-      const totalCap = units === 'metric' ? (tankVol * startPress) : tankVol;
-      document.getElementById('tankCapacitySubtext').innerText = `Total Capacity: ${totalCap.toFixed(0)} ${units === 'metric' ? 'L' : 'cu ft'} (${startPress} ${units === 'metric' ? 'bar' : 'psi'})`;
+  const totalCap = units === 'metric' ? (tankVol * startPress) : tankVol;
+  document.getElementById('tankCapacitySubtext').innerText = `Total Capacity: ${totalCap.toFixed(0)} ${units === 'metric' ? 'L' : 'cu ft'} (${startPress} ${units === 'metric' ? 'bar' : 'psi'})`;
 
-      if (waypoints.length <= 1) {
-        document.getElementById('totalGas').innerText = `0 ${units === 'metric' ? 'L' : 'cu ft'}`;
-        document.getElementById('finalPressure').innerText = `${startPress.toFixed(1)} ${units === 'metric' ? 'bar' : 'psi'}`;
-        return;
-      }
+  if (waypoints.length === 0) {
+    document.getElementById('totalGas').innerText = `0 ${units === 'metric' ? 'L' : 'cu ft'}`;
+    document.getElementById('finalPressure').innerText = `${startPress.toFixed(1)} ${units === 'metric' ? 'bar' : 'psi'}`;
+    return;
+  }
 
-      for (let i = 1; i < waypoints.length; i++) {
-        const p1 = waypoints[i - 1];
-        const p2 = waypoints[i];
-        const deltaTime = p2.time - p1.time;
-        if (deltaTime <= 0) continue;
+  // Render Stop #1 (Surface / Entry Point Baseline)
+  const firstWp = waypoints[0];
+  const trStart = document.createElement('tr');
+  trStart.innerHTML = `
+    <td class="py-1">#1</td>
+    <td class="py-1">${firstWp.time}m</td>
+    <td class="py-1">${firstWp.depth}${units === 'metric' ? 'm' : 'ft'}</td>
+    <td class="py-1 text-right text-amber-300 font-bold">0 ${units === 'metric' ? 'L' : 'cf'}</td>
+    <td class="py-1 text-right font-bold text-emerald-400">
+      ${remainingPressure.toFixed(1)} ${units === 'metric' ? 'bar' : 'psi'}
+    </td>
+  `;
+  tableBody.appendChild(trStart);
 
-        const avgDepth = (p1.depth + p2.depth) / 2;
-        const ata = units === 'metric' ? 1 + (avgDepth / 10) : 1 + (avgDepth / 33);
-        const segmentGas = sac * ata * deltaTime;
-        totalGasConsumed += segmentGas;
+  // Calculate and render remaining segments (#2, #3, ...)
+  for (let i = 1; i < waypoints.length; i++) {
+    const p1 = waypoints[i - 1];
+    const p2 = waypoints[i];
+    const deltaTime = p2.time - p1.time;
+    if (deltaTime <= 0) continue;
 
-        const pressureDrop = units === 'metric' ? (segmentGas / tankVol) : (segmentGas / tankVol) * startPress;
-        remainingPressure -= pressureDrop;
+    const avgDepth = (p1.depth + p2.depth) / 2;
+    const ata = units === 'metric' ? 1 + (avgDepth / 10) : 1 + (avgDepth / 33);
+    const segmentGas = sac * ata * deltaTime;
+    totalGasConsumed += segmentGas;
 
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="py-1">#${i + 1}</td>
-          <td class="py-1">${p2.time}m</td>
-          <td class="py-1">${p2.depth}${units === 'metric' ? 'm' : 'ft'}</td>
-          <td class="py-1 text-right text-amber-300 font-bold">${segmentGas.toFixed(0)} ${units === 'metric' ? 'L' : 'cf'}</td>
-          <td class="py-1 text-right font-bold ${remainingPressure < 50 ? 'text-rose-400' : 'text-emerald-400'}">
-            ${Math.max(0, remainingPressure).toFixed(1)} ${units === 'metric' ? 'bar' : 'psi'}
-          </td>
-        `;
-        tableBody.appendChild(tr);
-      }
+    const pressureDrop = units === 'metric' ? (segmentGas / tankVol) : (segmentGas / tankVol) * startPress;
+    remainingPressure -= pressureDrop;
 
-      document.getElementById('totalGas').innerText = `${totalGasConsumed.toFixed(0)} ${units === 'metric' ? 'L' : 'cu ft'}`;
-      document.getElementById('finalPressure').innerText = `${Math.max(0, remainingPressure).toFixed(1)} ${units === 'metric' ? 'bar' : 'psi'}`;
-    }
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="py-1">#${i + 1}</td>
+      <td class="py-1">${p2.time}m</td>
+      <td class="py-1">${p2.depth}${units === 'metric' ? 'm' : 'ft'}</td>
+      <td class="py-1 text-right text-amber-300 font-bold">${segmentGas.toFixed(0)} ${units === 'metric' ? 'L' : 'cf'}</td>
+      <td class="py-1 text-right font-bold ${remainingPressure < 50 ? 'text-rose-400' : 'text-emerald-400'}">
+        ${Math.max(0, remainingPressure).toFixed(1)} ${units === 'metric' ? 'bar' : 'psi'}
+      </td>
+    `;
+    tableBody.appendChild(tr);
+  }
+
+  document.getElementById('totalGas').innerText = `${totalGasConsumed.toFixed(0)} ${units === 'metric' ? 'L' : 'cu ft'}`;
+  document.getElementById('finalPressure').innerText = `${Math.max(0, remainingPressure).toFixed(1)} ${units === 'metric' ? 'bar' : 'psi'}`;
+}
 
     function recalculate() {
       drawChart();
